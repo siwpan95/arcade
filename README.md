@@ -1,38 +1,31 @@
-# 游戏合集
+# 街机合集 arcade-collection
 
-#### 介绍
-一个用于存放测试游戏的
-傻叉AI不知道在搞什么，连个readme都不会写，还让我pull？吃大份去吧。
+单文件玩具整合项目（2026-08-25 用户拍板）：6 个小游戏收进一个选单壳，每玩法保留一个现行版，重复重做版已删除。
 
-#### 软件架构
-软件架构说明
+## 纪律
 
+- 壳只做「展示 + 启动」；每个游戏**独立子进程 + 独立 cwd**（子进程隔离，崩一个不影响其他）；
+- 游戏文件原样保留在 `games/<name>/`（复制优于共享，不融合代码）；
+- 平台登记：`platform.yaml`（game 分类，入口 `python main.py`）。
 
-#### 安装教程
+## 收录
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+| 名称 | 目录 | 入口 |
+|---|---|---|
+| 俄罗斯方块 | games/tetris | main.py |
+| 井字棋 | games/tictactoe | 井字棋8.py |
+| 摸鱼下棋 | games/moyuxiaqi | moyuxiaqi.py |
+| KID-A 步行模拟器 | games/kid-a-walker | kid_a_walker.py |
+| ASCII 滑雪 | games/ski | main.py |
+| 拼图 | games/puzzle | main.py |
 
-#### 使用说明
+## 运行
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+```bash
+cd G:\games\arcade-collection
+python main.py
+```
 
-#### 参与贡献
+## 整合背景
 
-1.  Fork 本仓库
-2.  新建 Feat_xxx 分支
-3.  提交代码
-4.  新建 Pull Request
-
-
-#### 特技
-
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  Gitee 官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解 Gitee 上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
-5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+详见《单文件玩具整合方案_2026-08-25》：吸血鬼幸存者/公路驾驶/俄罗斯轮盘/贪吃蛇/文字传奇/挂机族等玩法重复重做已收敛（重复版删除，保留版独立成项目并登记平台）。
