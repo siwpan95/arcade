@@ -1,38 +1,19 @@
-# 游戏合集
+# game-collection — 游戏合集（分支 = 项目）
 
-#### 介绍
-一个用于存放测试游戏的
-傻叉AI不知道在搞什么，连个readme都不会写，还让我pull？吃大份去吧。
+> 每个分支 = 一个独立游戏项目（独立更新、独立推送）；平台库登记见 siwpan/allin-platform。
 
-#### 软件架构
-软件架构说明
+## 分支索引（2026-08-25）
 
+| 分支 | 项目 |
+|---|---|
+| MCclone | MC 克隆 |
+| dwarf_scrolls | 矮人卷轴 |
+| fish | 养鱼模拟器 |
+| mahjong | 麻将连连看 |
+| sandbox | 沙盒游戏 |
+| cordis_snake | Cordis 贪吃蛇（一切皆插件，2026-08-25 实验转正） |
+| arcade | 街机合集（10 小游戏：俄罗斯方块/井字棋/摸鱼下棋/KID-A 步行/滑雪/拼图/2048/解密终端/画线骑行/零食闯关，2026-08-25 玩具整合） |
 
-#### 安装教程
+## 许可
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
-
-#### 使用说明
-
-1.  xxxx
-2.  xxxx
-3.  xxxx
-
-#### 参与贡献
-
-1.  Fork 本仓库
-2.  新建 Feat_xxx 分支
-3.  提交代码
-4.  新建 Pull Request
-
-
-#### 特技
-
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  Gitee 官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解 Gitee 上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
-5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+MIT · Copyright (c) 2026 siwpan
