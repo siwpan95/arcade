@@ -18,6 +18,10 @@ GAMES = [
     ("KID-A 步行模拟器", "kid-a-walker", "kid_a_walker.py"),
     ("ASCII 滑雪", "ski", "main.py"),
     ("拼图", "puzzle", "main.py"),
+    ("2048（终端自动对弈）", "2048", "main.py"),
+    ("Calculator ∞ Alchemia 解密终端", "calculator", "main.py"),
+    ("Line Rider Pro 画线骑行", "rider", "main.py"),
+    ("六一零食大闯关", "sixone", "main.py"),
 ]
 
 

@@ -18,6 +18,10 @@
 | KID-A 步行模拟器 | games/kid-a-walker | kid_a_walker.py |
 | ASCII 滑雪 | games/ski | main.py |
 | 拼图 | games/puzzle | main.py |
+| 2048（终端自动对弈） | games/2048 | main.py |
+| Calculator ∞ Alchemia 解密终端 | games/calculator | main.py |
+| Line Rider Pro 画线骑行 | games/rider | main.py |
+| 六一零食大闯关 | games/sixone | main.py |
 
 ## 运行
 
