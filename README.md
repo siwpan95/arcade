@@ -30,6 +30,19 @@ cd G:\games\arcade-collection
 python main.py
 ```
 
+## 发行版（2026-08-25 打包跑通）
+
+```bash
+pip install pyinstaller pywin32 pywin32-ctypes   # pywin32-ctypes>=0.2.3（0.2.0 在 Py3.14 坏）
+python -m PyInstaller arcade.spec --noconfirm
+# 产物: dist/arcade/arcade.exe（onedir，整个 dist/arcade 目录即发行版）
+# release/arcade-collection-v1.0.0-win64.zip = 打包好的压缩分发件
+```
+
+- 打包模式游戏仍走独立进程：`arcade.exe --run <sub> <entry>`（exe 携带解释器重入执行）；
+- 数据文件（games/ 全目录）经 spec datas 打入 `_internal/games`，`sys._MEIPASS` 解析；
+- 冒烟已验证：exe 选单启动正常 + 打包态 --run 井字棋正常。
+
 ## 整合背景
 
 详见《单文件玩具整合方案_2026-08-25》：吸血鬼幸存者/公路驾驶/俄罗斯轮盘/贪吃蛇/文字传奇/挂机族等玩法重复重做已收敛（重复版删除，保留版独立成项目并登记平台）。
