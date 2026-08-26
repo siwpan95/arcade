@@ -30,18 +30,23 @@ cd G:\games\arcade-collection
 python main.py
 ```
 
-## 发行版（2026-08-25 打包跑通）
+## 发行版（2026-08-25 · 方案①逐游戏分体，已跑通）
 
 ```bash
 pip install pyinstaller pywin32 pywin32-ctypes   # pywin32-ctypes>=0.2.3（0.2.0 在 Py3.14 坏）
-python -m PyInstaller arcade.spec --noconfirm
-# 产物: dist/arcade/arcade.exe（onedir，整个 dist/arcade 目录即发行版）
-# release/arcade-collection-v1.0.0-win64.zip = 打包好的压缩分发件
+python build_all.py                 # 全量：菜单 onefile + 10 游戏 onedir
+python build_all.py --only tetris   # 只重打一个游戏（独立更新！）
+python make_release.py              # 每游戏 zip + 全量 zip
 ```
 
-- 打包模式游戏仍走独立进程：`arcade.exe --run <sub> <entry>`（exe 携带解释器重入执行）；
-- 数据文件（games/ 全目录）经 spec datas 打入 `_internal/games`，`sys._MEIPASS` 解析；
-- 冒烟已验证：exe 选单启动正常 + 打包态 --run 井字棋正常。
+产物：
+
+- `dist/arcade.exe`（菜单 onefile，2.1MB，仅 tkinter）
+- `dist/games/<sub>/<sub>.exe`（各游戏 onedir 平铺：exe+dll+数据同目录，cwd/__file__ 相对都成立；菜单以独立子进程启动）
+- `release/arcade-<游戏>-v1.0.0-win64.zip`（9 个 <100MB，可逐个上 gitee Release；sixone 107.7MB 仅入全量包）
+- `release/arcade-collection-v1.0.0-win64-full.zip`（313.9MB 全量分发）
+
+关键决策：**发行版保持子进程隔离**（每游戏一个 exe = 每游戏独立更新，插件化纪律的物理化）；sixone 因 pandas 依赖较大（259.6MB 目录），已排除 sqlalchemy/torch/cv2/numba/scipy 等非必要依赖。
 
 ## 整合背景
 

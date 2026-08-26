@@ -14,7 +14,7 @@ import tkinter as tk
 from pathlib import Path
 
 if getattr(sys, "frozen", False):
-    BASE = Path(sys._MEIPASS)
+    BASE = Path(sys.executable).resolve().parent  # 菜单 onefile：游戏 exe 在 dist/games/<sub>/
 else:
     BASE = Path(__file__).resolve().parent
 
@@ -34,29 +34,20 @@ GAMES = [
 
 def launch(sub, entry):
     d = BASE / "games" / sub
+    if getattr(sys, "frozen", False):
+        exe = d / (sub + ".exe")
+        if not exe.exists():
+            print("[arcade] 找不到游戏 exe:", exe)
+            return
+        subprocess.Popen([str(exe)], cwd=str(d))
+        return
     if not (d / entry).exists():
         print("[arcade] 找不到入口:", d / entry)
         return
-    subprocess.Popen([sys.executable, "--run", sub, entry], cwd=str(d))
-
-
-def run_game(sub, entry):
-    """--run 模式：执行目标游戏（子进程入口，run_name=__main__）。"""
-    import runpy
-    d = BASE / "games" / sub
-    os.chdir(str(d))
-    sys.argv = [str(d / entry)]
-    try:
-        runpy.run_path(str(d / entry), run_name="__main__")
-    except SystemExit:
-        pass
+    subprocess.Popen([sys.executable, str(d / entry)], cwd=str(d))
 
 
 def main():
-    if len(sys.argv) >= 3 and sys.argv[1] == "--run":
-        run_game(sys.argv[2], sys.argv[3])
-        return
-
     win = tk.Tk()
     win.title("街机合集 arcade-collection")
     win.geometry("360x560")
