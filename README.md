@@ -1,5 +1,8 @@
 # 街机合集 arcade
 
+> 仓库：<https://gitee.com/siwpan/arcade> ｜ 许可：MIT（见 [LICENSE](LICENSE)）
+> 注：文中 <PATH> 为路径占位符，请替换为你本机实际的目录 / 可执行文件路径。
+
 > 独立仓 siwpan/arcade（一仓一目录，2026-08-27 起）。单文件玩具整合项目（2026-08-25 用户拍板）：10 个小游戏收进一个选单壳，每玩法保留一个现行版，重复重做版已删除。
 
 ## 纪律
@@ -26,7 +29,7 @@
 ## 运行
 
 ```bash
-cd G:\repos\arcade
+cd <PATH>
 python main.py
 ```
 
