@@ -1,8 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
+# 入口脚本按 spec 所在目录推导（原为本机一条已失效的绝对路径，见硬编码门禁清单）
+import os
 
 
 a = Analysis(
-    ['D:\\allin\\cal\\calculator.py'],
+    [os.path.join(SPECPATH, 'calculator.py')],
     pathex=[],
     binaries=[],
     datas=[],

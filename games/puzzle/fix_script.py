@@ -1,6 +1,31 @@
-import re
+"""一次性补丁脚本：给 kid_a_walker.py 加 find_safe_spawn 并修类型注解。
 
-filepath = r'd:\allin\art\kid_a_walker.py'
+目标文件解析：命令行参数 → 本文件同级的 ../kid-a-walker/kid_a_walker.py → fail-loud
+（原写法钉死在本机一条已失效的绝对路径上，见硬编码门禁清单）
+
+用法:
+    python fix_script.py                       # 默认改本仓 games/kid-a-walker/kid_a_walker.py
+    python fix_script.py <kid_a_walker.py 路径> # 指定其它副本
+"""
+import re
+import sys
+from pathlib import Path
+
+DEFAULT_TARGET = Path(__file__).resolve().parent.parent / "kid-a-walker" / "kid_a_walker.py"
+
+
+def resolve_target():
+    if len(sys.argv) > 1:
+        return Path(sys.argv[1])
+    if DEFAULT_TARGET.is_file():
+        return DEFAULT_TARGET
+    raise SystemExit(
+        f"[fix_script] 找不到目标文件：{DEFAULT_TARGET}\n"
+        f"  用法：python {Path(__file__).name} <kid_a_walker.py 路径>"
+    )
+
+
+filepath = str(resolve_target())
 
 with open(filepath, 'r', encoding='utf-8') as f:
     content = f.read()
