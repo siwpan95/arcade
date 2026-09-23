@@ -59,7 +59,7 @@ ESC                  返回主菜单
 ## 🏗️ 架构
 
 ```
-G:\ice\
+<仓库根>/games/ski/
 ├── main.py        # 编排层：键盘事件 → 引擎 tick → UI 渲染
 ├── engine.py      # 纯游戏逻辑（零 UI 依赖），含雪人/跳跃/加速/碰撞
 ├── ui.py          # Tkinter 渲染层：内存网格 + 整帧写入 + HUD

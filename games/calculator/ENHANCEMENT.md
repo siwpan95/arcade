@@ -159,7 +159,7 @@
 ## 启动方式
 
 ```bash
-cd G:/calculator
+cd <PATH>
 python main.py
 ```
 
