@@ -508,6 +508,12 @@ def make_room_energy_core():
     """紫色能量核心（四向）"""
     g = _mk_empty()
     _fill_rect(g, 4, 4, 16, 16)
+    # 门廊：把门洞(0-1)连到大厅(4-16)。漏掉这步时四个门全部"通而不达"、
+    # 整个区块被隔离（能量核心曾因此成为出生点牢笼）。
+    _fill_rect(g, 2, 9, 3, 11)      # N 门廊
+    _fill_rect(g, 17, 9, 18, 11)    # S 门廊
+    _fill_rect(g, 9, 2, 11, 3)      # W 门廊
+    _fill_rect(g, 9, 17, 11, 18)    # E 门廊
     # 中心能量柱
     g[10][10] = '6'
     for r, c in [(6,6),(6,14),(14,6),(14,14)]:
@@ -724,8 +730,9 @@ def make_room_generator_room():
     g = _mk_empty()
     _fill_rect(g, 0, 9, 20, 11)
     _fill_rect(g, 9, 0, 11, 11)
-    # 大型发电机
-    _fill_rect(g, 6, 3, 14, 7, '#')
+    # 大型发电机（rows 3-8，**避开 rows 9-11 的西侧门廊**——
+    # 原位置 rows 6-14 压在门廊上，把西门封成了死路）
+    _fill_rect(g, 3, 3, 8, 7, '#')
     g[8][5] = '7'  # 橙色能量线
     g[8][6] = '7'
     g[12][5] = '7'
@@ -751,6 +758,12 @@ def make_room_portal_gate():
     """传送门大厅（四向）- 稀有事件"""
     g = _mk_empty()
     _fill_rect(g, 4, 4, 16, 16)
+    # 门廊：连门洞(0-1)与大厅(4-16)（与 energy_core 同款修复——
+    # 少了它四门"通而不达"，传送门大厅会被彻底隔离）
+    _fill_rect(g, 2, 9, 3, 11)      # N 门廊
+    _fill_rect(g, 17, 9, 18, 11)    # S 门廊
+    _fill_rect(g, 9, 2, 11, 3)      # W 门廊
+    _fill_rect(g, 9, 17, 11, 18)    # E 门廊
     # 中心传送门
     g[10][10] = 'C'  # 传送门格子
     # 四角发光柱
@@ -785,11 +798,14 @@ _ALL_TEMPLATES = {
                                     make_room_fire_exit, make_room_crystal_cavern,
                                     make_room_neon_highway, make_room_ancient_library,
                                     make_room_abandoned_lab, make_room_pit_trap],
-    frozenset({'N','E','W'}):     [make_room_tee_n, make_room_tech_nook,
-                                    make_room_data_temple, make_room_generator_room],
+    # 注：tech_nook / data_temple / generator_room 曾错放在 N/E/W 组，但三者
+    # 实现分别只开 N/S/E、N/S/E、N/S/W 口（generator_room 的 docstring 就写着
+    # N/S/W）——声明与实际不符，玩家从错误方向进入会撞墙。按实现修正分组。
+    frozenset({'N','E','W'}):     [make_room_tee_n],
     frozenset({'S','E','W'}):     [make_room_tee_s, make_room_bone_garden],
-    frozenset({'N','S','E'}):     [make_room_tee_e],
-    frozenset({'N','S','W'}):     [make_room_tee_w],
+    frozenset({'N','S','E'}):     [make_room_tee_e, make_room_tech_nook,
+                                    make_room_data_temple],
+    frozenset({'N','S','W'}):     [make_room_tee_w, make_room_generator_room],
     frozenset({'N','E'}):         [make_room_corner_ne],
     frozenset({'N','W'}):         [make_room_corner_nw],
     frozenset({'S','E'}):         [make_room_corner_se],
@@ -894,7 +910,7 @@ class WorldMap:
                 forced.add(d)
 
         # 从模板库中筛选并随机选择
-        exits = self._pick_exits(forced)
+        exits = self._pick_exits(forced, coord)
         template_fn = self._pick_template(exits)
         grid = template_fn()
         self._chunks[coord] = grid
@@ -902,16 +918,30 @@ class WorldMap:
         # 记录模板函数名（用于暗室判定）
         self._template_names[coord] = template_fn.__name__
 
-    def _pick_exits(self, forced):
-        """在 forced 基础上随机扩充出口（确保至少有一条路回来）"""
+    def _pick_exits(self, forced, coord):
+        """在 forced 基础上随机扩充出口（确保至少有一条路回来）。
+
+        随机扩充必须额外检查：**若某方向的邻居已生成且没有声明反向出口，
+        则该方向不能开** —— 否则会产生"单边出口"（玩家走出去撞墙）。
+        forced 来自已生成邻居的反向声明，天然互连，无需检查。
+        """
         exits = set(forced)
+        cx, cy = coord
+
+        def _ok(d):
+            nb = (cx + _DIR_DELTA[d][0], cy + _DIR_DELTA[d][1])
+            return nb not in self._exits or _OPPOSITE[d] in self._exits[nb]
+
         # 随机添加额外出口
         for d in ['N', 'S', 'E', 'W']:
-            if d not in exits and self._rng.random() < 0.45:
+            if d not in exits and _ok(d) and self._rng.random() < 0.45:
                 exits.add(d)
-        # 保证至少2个出口
-        while len(exits) < 2:
-            exits.add(self._rng.choice(['N', 'S', 'E', 'W']))
+        # 保证至少2个出口（只从"不会造死路"的方向里补）
+        pool = [d for d in ['N', 'S', 'E', 'W'] if d not in exits and _ok(d)]
+        while len(exits) < 2 and pool:
+            d = self._rng.choice(pool)
+            pool.remove(d)
+            exits.add(d)
         return frozenset(exits)
 
     def _pick_template(self, exits):
