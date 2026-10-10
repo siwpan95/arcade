@@ -16,16 +16,21 @@ import collections
 import os
 import sys
 import unittest
+from types import SimpleNamespace
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
 try:
-    import kid_a_walker as K
+    # 2026-10-10 拆包后实现迁入 kaw/ 包；SimpleNamespace 保持 K.* 旧引用写法
+    from kaw.world.worldmap import WorldMap
+    from kaw.world.pool import _ALL_TEMPLATES, _DIR_DELTA, _OPPOSITE
+    K = SimpleNamespace(WorldMap=WorldMap, _ALL_TEMPLATES=_ALL_TEMPLATES,
+                        _DIR_DELTA=_DIR_DELTA, _OPPOSITE=_OPPOSITE)
     _HAVE_DEPS = True
     _SKIP_REASON = ''
 except Exception as exc:                       # 缺 pygame/numpy 等
     _HAVE_DEPS = False
-    _SKIP_REASON = f'需要 pygame/numpy：{exc!r}'
+    _SKIP_REASON = f'需要 kaw 包依赖（pygame/numpy）：{exc!r}'
 
 # 各方向"门洞内侧格"与"边界开口格"（原版约定：出口固定 3 格宽）
 OUTER = {'N': ((0, 9), (0, 10), (0, 11)),

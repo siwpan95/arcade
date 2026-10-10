@@ -22,11 +22,14 @@ _ALL_TEMPLATES = {
                                     make_room_fire_exit, make_room_crystal_cavern,
                                     make_room_neon_highway, make_room_ancient_library,
                                     make_room_abandoned_lab, make_room_pit_trap],
-    frozenset({'N','E','W'}):     [make_room_tee_n, make_room_tech_nook,
-                                    make_room_data_temple, make_room_generator_room],
+    # 注：tech_nook / data_temple / generator_room 曾错放在 N/E/W 组，但三者
+    # 实现分别只开 N/S/E、N/S/E、N/S/W 口（generator_room 的 docstring 就写着
+    # N/S/W）——声明与实际不符，玩家从错误方向进入会撞墙。按实现修正分组。
+    frozenset({'N','E','W'}):     [make_room_tee_n],
     frozenset({'S','E','W'}):     [make_room_tee_s, make_room_bone_garden],
-    frozenset({'N','S','E'}):     [make_room_tee_e],
-    frozenset({'N','S','W'}):     [make_room_tee_w],
+    frozenset({'N','S','E'}):     [make_room_tee_e, make_room_tech_nook,
+                                    make_room_data_temple],
+    frozenset({'N','S','W'}):     [make_room_tee_w, make_room_generator_room],
     frozenset({'N','E'}):         [make_room_corner_ne],
     frozenset({'N','W'}):         [make_room_corner_nw],
     frozenset({'S','E'}):         [make_room_corner_se],

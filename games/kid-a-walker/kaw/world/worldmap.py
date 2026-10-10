@@ -108,7 +108,7 @@ class WorldMap:
                 forced.add(d)
 
         # 从模板库中筛选并随机选择
-        exits = self._pick_exits(forced)
+        exits = self._pick_exits(forced, coord)
         template_fn = self._pick_template(exits)
         grid = template_fn()
         self._chunks[coord] = grid
@@ -116,16 +116,30 @@ class WorldMap:
         # 记录模板函数名（用于暗室判定）
         self._template_names[coord] = template_fn.__name__
 
-    def _pick_exits(self, forced):
-        """在 forced 基础上随机扩充出口（确保至少有一条路回来）"""
+    def _pick_exits(self, forced, coord):
+        """在 forced 基础上随机扩充出口（确保至少有一条路回来）。
+
+        随机扩充必须额外检查：**若某方向的邻居已生成且没有声明反向出口，
+        则该方向不能开** —— 否则会产生"单边出口"（玩家走出去撞墙）。
+        forced 来自已生成邻居的反向声明，天然互连，无需检查。
+        """
         exits = set(forced)
+        cx, cy = coord
+
+        def _ok(d):
+            nb = (cx + _DIR_DELTA[d][0], cy + _DIR_DELTA[d][1])
+            return nb not in self._exits or _OPPOSITE[d] in self._exits[nb]
+
         # 随机添加额外出口
         for d in ['N', 'S', 'E', 'W']:
-            if d not in exits and self._rng.random() < 0.45:
+            if d not in exits and _ok(d) and self._rng.random() < 0.45:
                 exits.add(d)
-        # 保证至少2个出口
-        while len(exits) < 2:
-            exits.add(self._rng.choice(['N', 'S', 'E', 'W']))
+        # 保证至少2个出口（只从"不会造死路"的方向里补）
+        pool = [d for d in ['N', 'S', 'E', 'W'] if d not in exits and _ok(d)]
+        while len(exits) < 2 and pool:
+            d = self._rng.choice(pool)
+            pool.remove(d)
+            exits.add(d)
         return frozenset(exits)
 
     def _pick_template(self, exits):
