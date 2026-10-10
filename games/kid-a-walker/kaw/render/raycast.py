@@ -105,29 +105,6 @@ class Renderer:
                 t = (y - H // 2) / (H // 2)
                 pygame.draw.line(self.surf, self._lerp(C_FLOOR_T, C_FLOOR_B, t), (0, y), (W, y))
 
-    def _cast(self, px, py, angle, world: WorldMap):
-        rx = math.cos(angle)
-        ry = math.sin(angle)
-        mx, my = int(px), int(py)
-        ddx = abs(1.0 / rx) if abs(rx) > 1e-9 else 1e18
-        ddy = abs(1.0 / ry) if abs(ry) > 1e-9 else 1e18
-        sx = 1 if rx > 0 else -1
-        sy = 1 if ry > 0 else -1
-        dist_x = (mx + 1 - px) * ddx if rx > 0 else (px - mx) * ddx
-        dist_y = (my + 1 - py) * ddy if ry > 0 else (py - my) * ddy
-        side = 0
-        for _ in range(MAX_DEPTH * 4):
-            if dist_x < dist_y:
-                dist_x += ddx; mx += sx; side = 0
-            else:
-                dist_y += ddy; my += sy; side = 1
-            ct = world.cell(mx, my)
-            if ct > 0:
-                d = (mx - px + (1 - sx) / 2) / rx if side == 0 \
-                    else (my - py + (1 - sy) / 2) / ry
-                return abs(d), ct, side
-        return float(MAX_DEPTH), 0, 0
-
     def _cast_optimized(self, px: float, py: float, cos_val: float, sin_val: float, world: WorldMap):
         """优化射线投射：使用预计算值"""
         mx, my = int(px), int(py)

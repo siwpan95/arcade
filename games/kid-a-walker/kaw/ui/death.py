@@ -75,14 +75,3 @@ class DeathScreen:
         col = (int(150 + 105 * pulse), 255, int(200 + 55 * pulse))
         hint = f_sm.render("[R] RESTART  |  [ESC] QUIT", True, col)
         screen.blit(hint, (sw // 2 - hint.get_width() // 2, sh * 3 // 4))
-
-    @staticmethod
-    def draw_with_highscore(screen, f_sm, f_bg, fragments, survival_time, explored_count, tick, highscore=0):
-        """绘制结算画面（含最高分）"""
-        DeathScreen.draw(screen, f_sm, f_bg, fragments, survival_time, explored_count, tick)
-        if highscore > 0:
-            score = DeathScreen.calculate_score(fragments, survival_time, explored_count)
-            sw, sh = screen.get_size()
-            hs_col = (255, 255, 100) if score >= highscore else (120, 120, 140)
-            hs_text = f_sm.render(f"BEST: {highscore}", True, hs_col)
-            screen.blit(hs_text, (sw // 2 - hs_text.get_width() // 2, sh * 3 // 4 - 30))

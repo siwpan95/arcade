@@ -12,6 +12,13 @@ from ..config import (
 from .pool import _ALL_TEMPLATES, _DIR_DELTA, _OPPOSITE
 from .templates import make_room_cross
 
+# 模板字符 → 格值 查找表（'.':0 空  '#':1 墙  'C':12 传送门）
+_CELL_CODES = {
+    '.': 0, '#': 1,
+    '2': 2, '3': 3, '4': 4, '5': 5, '6': 6,
+    '7': 7, '8': 8, '9': 9, 'A': 10, 'B': 11, 'C': 12,
+}
+
 class WorldMap:
     """
     管理无限延伸的区块网格。
@@ -181,24 +188,7 @@ class WorldMap:
         if chunk is None:
             return 1   # 未生成区块视为墙壁，防止空气墙
         ch = chunk[ly][lx]
-        if ch == '.': return 0
-        if ch == '#': return 1
-        if ch == '2': return 2
-        if ch == '3': return 3
-        if ch == '4': return 4
-        if ch == '5': return 5
-        if ch == '6': return 6
-        if ch == '7': return 7
-        if ch == '8': return 8
-        if ch == '9': return 9
-        if ch == 'A': return 10
-        if ch == 'B': return 11
-        if ch == 'C': return 12  # 传送门
-        return 1
-    
-    def cell_blocking(self, wx: float, wy: float) -> bool:
-        """检查指定坐标是否阻挡移动（只检查已生成的墙）"""
-        return self.cell(wx, wy) == 1
+        return _CELL_CODES.get(ch, 1)
 
     # ── 当前区块坐标 ──
     @staticmethod
@@ -209,10 +199,6 @@ class WorldMap:
     # ── 已生成区块列表 ──
     def generated_chunks(self):
         return list(self._chunks.keys())
-
-    # ── 区块出口信息 ──
-    def exits_of(self, cx, cy):
-        return self._exits.get((cx, cy), set())
 
     # ── 暗室判定 ──
     def is_dark_room(self, cx: int, cy: int) -> bool:
@@ -237,24 +223,3 @@ class WorldMap:
         if glow_count <= 4 and open_count < 80:
             return True
         return False
-
-    def chunk_zone(self, cx: int, cy: int) -> int:
-        """返回区块的主导区域类型（统计装饰格子最多的类型）"""
-        chunk = self._chunks.get((cx, cy))
-        if chunk is None:
-            return 2  # 默认空灵神秘
-        counts: dict[int, int] = {}
-        for row in chunk:
-            for ch in row:
-                if ch in ('.', '#'):
-                    continue
-                if '2' <= ch <= '9':
-                    v = int(ch)
-                elif ch == 'A': v = 10
-                elif ch == 'B': v = 11
-                elif ch == 'C': v = 12
-                else:
-                    continue
-                if v >= 2:
-                    counts[v] = counts.get(v, 0) + 1
-        return max(counts, key=counts.get) if counts else 2

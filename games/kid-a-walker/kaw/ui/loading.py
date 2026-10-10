@@ -37,29 +37,6 @@ class LoadingScreen:
         self._animate = 0.0
         self._bg_parts: list[tuple[int, int, float, float, int]] | None = None
 
-    def wait_for_start(self) -> bool:
-        """显示开始界面，等待玩家按键开始，返回是否继续游戏"""
-        pygame.mouse.set_visible(True)
-        while True:
-            dt = self.clock.tick(60) / 1000.0
-            self._animate += dt
-
-            for ev in pygame.event.get():
-                if ev.type == pygame.QUIT:
-                    return False
-                elif ev.type == pygame.KEYDOWN:
-                    if ev.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_ESCAPE):
-                        if ev.key == pygame.K_ESCAPE:
-                            return False
-                        pygame.mouse.set_visible(False)
-                        return True
-                elif ev.type == pygame.MOUSEBUTTONDOWN:
-                    pygame.mouse.set_visible(False)
-                    return True
-
-            self._draw_start_screen()
-            pygame.display.flip()
-
     def update_progress(self, progress: float, status: str = "") -> None:
         """更新加载进度，0.0 ~ 1.0"""
         self.progress = max(0.0, min(1.0, progress))

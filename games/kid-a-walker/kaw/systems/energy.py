@@ -16,13 +16,15 @@ class EnergySystem:
     grace_timer: float = SPAWN_GRACE_PERIOD  # 出生保护期倒计时
     is_dead: bool = False
 
-    def update(self, dt: float, is_moving: bool, zone_type: int,
-               near_glow: bool, drain_mult: float = 1.0, shielded: bool = False):
+    def update(self, dt: float, is_moving: bool,
+               near_glow: bool, near_red: bool, near_acid: bool,
+               drain_mult: float = 1.0, shielded: bool = False):
         """每帧更新能量值
         dt: 帧间隔（秒）
         is_moving: 玩家是否在移动
-        zone_type: 当前脚下格子类型（3=红色区）
-        near_glow: 是否在发光柱(2)附近
+        near_glow: 是否在发光柱(2)附近（5x5 邻域）
+        near_red: 是否在红色警示区(3)附近（5x5 邻域）
+        near_acid: 是否在酸液池(5)附近（5x5 邻域）
         drain_mult: AbilitySystem 提供的消耗倍率
         shielded: 是否处于危险免疫状态（AbilitySystem全收集免疫）
         """
@@ -46,16 +48,16 @@ class EnergySystem:
         shield_mult = 0.5 if self.shield_timer > 0 else 1.0
 
         # 消耗计算
-        # 红色区独立消耗（不论移动与否）
-        if zone_type == 3:
+        # 红色警示区邻域消耗（不论移动与否）
+        if near_red:
             self.energy -= self.drain_red * dt * drain_mult * shield_mult
             if is_moving:
                 self.energy -= self.drain_move * dt * drain_mult * shield_mult
         elif is_moving:
             self.energy -= self.drain_move * dt * drain_mult * shield_mult
 
-        # 酸液池接触（格子5）
-        if zone_type == 5:
+        # 酸液池邻域接触
+        if near_acid:
             self.energy -= ACID_DRAIN_RATE * dt * shield_mult
 
         # 发光柱恢复

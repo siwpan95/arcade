@@ -417,23 +417,31 @@ class Game:
                 self.py = ny
 
         # ─── 传送门事件（P2-5） ───
-        current_cell = self.world.cell(self.px, self.py)
-        if current_cell == 12:  # 传送门
-            if random.random() < PORTAL_TELEPORT_CHANCE:
-                # 随机传送到远处（5~15个区块距离）
-                offset_cx = random.choice([-1, 1]) * random.randint(5, 15)
-                offset_cy = random.choice([-1, 1]) * random.randint(5, 15)
-                cur_c = self.world.world_to_chunk(self.px, self.py)
-                target_cx = cur_c[0] + offset_cx
-                target_cy = cur_c[1] + offset_cy
-                # 确保目标区块已生成
-                self.world.ensure_neighbors(target_cx, target_cy)
-                # 寻找安全出生点
-                spawn = self.world.find_safe_spawn(target_cx, target_cy)
-                self.px, self.py = spawn
-                self.last_chunk = (target_cx, target_cy)
-                # 传送音效
-                self.sfx.play_shield()
+        # 邻近触发：传送门格(C=12)本身不可踏入（移动只允许空地），
+        # 改为扫描 3x3 邻域，靠近时每帧按概率传送
+        near_portal = False
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                if self.world.cell(self.px + dx, self.py + dy) == 12:
+                    near_portal = True
+                    break
+            if near_portal:
+                break
+        if near_portal and random.random() < PORTAL_TELEPORT_CHANCE:
+            # 随机传送到远处（5~15个区块距离）
+            offset_cx = random.choice([-1, 1]) * random.randint(5, 15)
+            offset_cy = random.choice([-1, 1]) * random.randint(5, 15)
+            cur_c = self.world.world_to_chunk(self.px, self.py)
+            target_cx = cur_c[0] + offset_cx
+            target_cy = cur_c[1] + offset_cy
+            # 确保目标区块已生成
+            self.world.ensure_neighbors(target_cx, target_cy)
+            # 寻找安全出生点
+            spawn = self.world.find_safe_spawn(target_cx, target_cy)
+            self.px, self.py = spawn
+            self.last_chunk = (target_cx, target_cy)
+            # 传送音效
+            self.sfx.play_shield()
         
         # 区块边缘检测
         cur_chunk = self.world.world_to_chunk(self.px, self.py)
@@ -442,20 +450,23 @@ class Game:
             self.world.ensure_neighbors(cur_chunk[0], cur_chunk[1])
         
         # ─── 2. 能量更新 ───
-        zone_type = self.world.cell(self.px, self.py)
-        # 检查附近是否有发光柱(2)
-        near_glow = False
+        # 单次 5x5 邻域扫描：发光柱(2)恢复 / 红色警示区(3)消耗 / 酸液池(5)消耗
+        near_glow = near_red = near_acid = False
         for dy in range(-2, 3):
             for dx in range(-2, 3):
-                if self.world.cell(self.px + dx, self.py + dy) == 2:
+                ct = self.world.cell(self.px + dx, self.py + dy)
+                if ct == 2:
                     near_glow = True
-                    break
-            if near_glow:
+                elif ct == 3:
+                    near_red = True
+                elif ct == 5:
+                    near_acid = True
+            if near_glow and near_red and near_acid:
                 break
-        
+
         drain_mult = self.abilities.get_drain_multiplier()
         shielded = self.abilities.is_danger_immune()
-        self.energy.update(dt, is_moving, zone_type, near_glow, drain_mult, shielded)
+        self.energy.update(dt, is_moving, near_glow, near_red, near_acid, drain_mult, shielded)
         
         # 能量耗尽 → 死亡
         if self.energy.is_dead:
