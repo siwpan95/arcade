@@ -62,8 +62,9 @@ GUI 窗口游戏，运行后会阻塞等待交互。
 ## 测试
 ```
 <PATH>/python.exe tools/regression.py
-<PATH>/python.exe tools/perf_window.py    # 真机 window 模式帧时（无头无效）
-<PATH>/python.exe tools/bloom_probe.py    # bloom/网格观感对比样张（无头可跑）
+<PATH>/python.exe tools/perf_window.py      # 真机 window 模式帧时（无头无效）
+<PATH>/python.exe tools/bloom_probe.py      # bloom/网格观感对比样张（无头可跑）
+<PATH>/python.exe tools/capture_gameplay.py # 完整流程录制 → build_test/gameplay_full.mp4
 <PATH>/python.exe tests/test_map.py
 ```
 
