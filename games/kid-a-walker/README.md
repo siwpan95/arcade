@@ -43,10 +43,12 @@ GUI 窗口游戏，运行后会阻塞等待交互。
 `kaw/config.py` 的 `RENDER_BACKEND` 切换（三后端接口一致 `draw_world`，可直接 A/B 对比）：
 
 - `"gl"`（默认）：**ModernGL 真 3D + 后处理管线**。区块网格（地板/墙/天花板，面剔除 +
-  向量化烘焙）+ 装饰物 billboard（软发光）+ shader 里的距离雾/程序化网格/重力照明，
-  再经 亮部提取→半分辨率 bloom→扫描线→暗角→曝光 合成上屏；粒子为世界坐标（透视投影）。
+  向量化烘焙）+ 装饰物 billboard（实例化渲染，软发光）+ shader 里的距离雾/程序化网格/重力照明，
+  再经 **EEVEE 式 bloom mip 链**（软膝亮通 → Karis 加权 box 下采样 → 9-tap tent 上采样累加，
+  半精度 HDR：R11F_G11F_B10F → RGBA16F → RGBA8 自动回退）→ 扫描线→暗角→曝光 合成上屏；
+  粒子为世界坐标（透视投影）。
   - 有显示时走 **window 模式**：`pygame.OPENGL` 真窗口，3D 渲进 FBO、后处理后直接上屏，
-    2D 覆盖层（HUD/界面）作为纹理叠加，**无像素读回**。
+    2D 覆盖层（HUD/界面）作为纹理叠加，**无像素读回**（真机实测 p50≈5.6ms / 177 FPS）。
   - 无 GL 窗口（无头/兼容）自动退 **offscreen 模式**：同一套管线渲染后读回 blit 到 2D 主屏。
   - 再不行自动回退 `enhanced`。
 - `"enhanced"`：伪 3D 增强版。地面/天花板透视投影（Doom 式 shade table + mip）、
@@ -60,6 +62,7 @@ GUI 窗口游戏，运行后会阻塞等待交互。
 ## 测试
 ```
 <PATH>/python.exe tools/regression.py
+<PATH>/python.exe tools/perf_window.py    # 真机 window 模式帧时（无头无效）
 <PATH>/python.exe tests/test_map.py
 ```
 

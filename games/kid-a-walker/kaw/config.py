@@ -100,6 +100,10 @@ GL_BB_H         = 1.15    # 装饰物 billboard 高
 GL_EXPOSURE        = 1.45   # 全局曝光
 GL_BLOOM_THRESHOLD = 0.45   # 亮部提取阈值（亮度低于它的不发光）
 GL_BLOOM_STRENGTH  = 0.75   # bloom 叠加强度
+GL_BLOOM_KNEE      = 0.60   # 软膝宽度（×阈值）：0=硬阈值，防 banding（EEVEE 同款曲线）
+GL_BLOOM_CLAMP     = 2.5    # 单像素亮度钳制上限（0=关闭），防爆发亮斑
+GL_BLOOM_MIPS      = 4      # bloom 下采样链级数（1/2 → 1/16）
+GL_BLOOM_SAMPLE_SCALE = 1.0 # 上采样 tent 半径缩放（EEVEE sampleScale）
 GL_SCANLINE_ALPHA  = 0.10   # 扫描线强度（对应旧版 25/255）
 GL_VIGNETTE_MAX    = 0.16   # 四角最大压暗（对应旧版 40/255）
 

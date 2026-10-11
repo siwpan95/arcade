@@ -4,7 +4,8 @@
 两种呈现模式，走**同一条 GL 管线**（因此无头验证也能覆盖后处理）：
 
 - ``window``   ：主窗口用 ``pygame.OPENGL`` 建立，moderngl 接管该上下文。
-  3D → scene FBO → bloom（半分辨率）→ 后处理(扫描线/暗角/曝光) → 屏幕帧缓冲，
+  3D → scene FBO → bloom（EEVEE 式 mip 链：软膝亮通 → Karis box 下采样 →
+  tent 上采样累加，半精度 HDR）→ 后处理(扫描线/暗角/曝光) → 屏幕帧缓冲，
   2D 覆盖层（HUD/粒子/界面）作为纹理叠在最上层。**无像素读回**，最快路径。
 - ``offscreen``：主窗口保持 pygame 2D，GL 在独立离屏上下文里渲染同一条管线，
   最后把合成结果读回、blit 到 2D 主屏。用于无头环境 / GL 窗口创建失败的回退。
@@ -32,6 +33,10 @@ from ..config import (
     C_WALL_NR,
     GL_BB_H,
     GL_BB_W,
+    GL_BLOOM_CLAMP,
+    GL_BLOOM_KNEE,
+    GL_BLOOM_MIPS,
+    GL_BLOOM_SAMPLE_SCALE,
     GL_BLOOM_STRENGTH,
     GL_BLOOM_THRESHOLD,
     GL_EYE_Z,
@@ -114,9 +119,9 @@ void main() {
 """
 
 _BB_VERT = """#version 330
-in vec3 in_pos;        // 顶点：装饰物中心(x, y, 0)
-in vec3 in_col;        // 顶点：发光色
-in vec2 in_corner;     // 顶点：单位四边形角(-0.5..0.5, 0..1)
+in vec2 in_corner;     // 单位四边形角：x∈[-0.5,0.5], y∈[0,1]（左下原点）
+in vec3 in_inst_pos;   // 实例属性：装饰物世界位置
+in vec3 in_inst_col;   // 实例属性：发光色
 uniform mat4 u_view;
 uniform mat4 u_proj;
 uniform vec3 u_right;
@@ -126,10 +131,10 @@ uniform float u_h;
 out vec2 v_uv;
 out vec3 v_col;
 void main() {
-    vec3 world = in_pos + u_right * (in_corner.x * u_w) + u_up * (in_corner.y * u_h);
+    vec3 world = in_inst_pos + u_right * (in_corner.x * u_w) + u_up * (in_corner.y * u_h);
     gl_Position = u_proj * u_view * vec4(world, 1.0);
     v_uv = in_corner + vec2(0.5, 0.0);
-    v_col = in_col;
+    v_col = in_inst_col;
 }
 """
 
@@ -157,29 +162,66 @@ void main() {
 _BRIGHT_FRAG = """#version 330
 in vec2 v_uv;
 uniform sampler2D u_scene;
-uniform float u_threshold;
+uniform vec4 u_curve;      // EEVEE 软膝曲线四元组 {t-knee, knee*2, 0.25/knee, t}
+uniform float u_clamp;     // 单像素亮度上限，<=0 关闭
 out vec4 frag;
 void main() {
-    vec3 c = texture(u_scene, v_uv).rgb;
-    float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
-    frag = vec4(c * smoothstep(u_threshold, u_threshold + 0.4, l), 1.0);
+    vec3 m = texture(u_scene, v_uv).rgb;
+    // 亮度取最大分量（EEVEE 同款）：能量集中，光晕形态贴光斑
+    float br = max(m.r, max(m.g, m.b));
+    // 阈值以下二次软膝过渡，替代硬 smoothstep —— 防暗部 banding
+    float rq = clamp(br - u_curve.x, 0.0, u_curve.y);
+    rq = u_curve.z * rq * rq;
+    m *= max(rq, br - u_curve.w) / max(1e-5, br);
+    // 强度钳制
+    if (u_clamp > 0.0) {
+        br = max(1e-5, max(m.r, max(m.g, m.b)));
+        m *= 1.0 - max(0.0, br - u_clamp) / br;
+    }
+    frag = vec4(m, 1.0);
 }
 """
 
-_BLUR_FRAG = """#version 330
+_DOWN_FRAG = """#version 330
 in vec2 v_uv;
 uniform sampler2D u_tex;
-uniform vec2 u_dir;        // 纹素步长 × 方向
+uniform vec2 u_texel;      // 源级纹素 1/size
 out vec4 frag;
 void main() {
-    vec3 s = texture(u_tex, v_uv).rgb * 0.227027;
-    vec2 o1 = u_dir * 1.3846153846;
-    vec2 o2 = u_dir * 3.2307692308;
-    s += texture(u_tex, v_uv + o1).rgb * 0.3162162162;
-    s += texture(u_tex, v_uv - o1).rgb * 0.3162162162;
-    s += texture(u_tex, v_uv + o2).rgb * 0.0702702703;
-    s += texture(u_tex, v_uv - o2).rgb * 0.0702702703;
-    frag = vec4(s, 1.0);
+    // 4x4 box 下采样 + Karis 亮度加权（抗闪烁，EEVEE/CoD 同款）
+    vec4 d = u_texel.xyxy * vec4(-1.0, -1.0, 1.0, 1.0);
+    vec3 s1 = texture(u_tex, v_uv + d.xy).rgb;
+    vec3 s2 = texture(u_tex, v_uv + d.zy).rgb;
+    vec3 s3 = texture(u_tex, v_uv + d.xw).rgb;
+    vec3 s4 = texture(u_tex, v_uv + d.zw).rgb;
+    float w1 = 1.0 / (max(s1.r, max(s1.g, s1.b)) + 1.0);
+    float w2 = 1.0 / (max(s2.r, max(s2.g, s2.b)) + 1.0);
+    float w3 = 1.0 / (max(s3.r, max(s3.g, s3.b)) + 1.0);
+    float w4 = 1.0 / (max(s4.r, max(s4.g, s4.b)) + 1.0);
+    frag = vec4((s1 * w1 + s2 * w2 + s3 * w3 + s4 * w4) / (w1 + w2 + w3 + w4), 1.0);
+}
+"""
+
+_UP_FRAG = """#version 330
+in vec2 v_uv;
+uniform sampler2D u_tex;
+uniform vec2 u_texel;      // 源级（更粗）纹素 1/size
+uniform float u_scale;     // tent 半径缩放
+out vec4 frag;
+void main() {
+    // 9-tap 双线性 tent 上采样（输出=模糊分量；叠加由 ONE,ONE 加法混合完成）
+    vec4 d = u_texel.xyxy * vec4(1.0, 1.0, -1.0, 0.0) * u_scale;
+    vec3 s;
+    s  = texture(u_tex, v_uv - d.xy).rgb;
+    s += texture(u_tex, v_uv - d.wy).rgb * 2.0;
+    s += texture(u_tex, v_uv - d.zy).rgb;
+    s += texture(u_tex, v_uv + d.zw).rgb * 2.0;
+    s += texture(u_tex, v_uv).rgb * 4.0;
+    s += texture(u_tex, v_uv + d.xw).rgb * 2.0;
+    s += texture(u_tex, v_uv + d.zy).rgb;
+    s += texture(u_tex, v_uv + d.wy).rgb * 2.0;
+    s += texture(u_tex, v_uv + d.xy).rgb;
+    frag = vec4(s * (1.0 / 16.0), 1.0);
 }
 """
 
@@ -238,19 +280,22 @@ class GLRenderer:
         self.mode = mode            # 'offscreen'（读回）| 'window'（真窗口）
         self._ctx = ctx
         self._fbo_scene = None
-        self._fbo_bloom_a = None
-        self._fbo_bloom_b = None
+        self._bloom_mips = None    # [(fbo, w, h), ...] 1/2 → 1/2^N
+        self._bloom_fmt = ""       # 实际采用的 bloom 纹理格式名
         self._fbo_out = None        # offscreen 模式的合成目标
         self._prog_world = None
         self._prog_bb = None
         self._prog_bright = None
-        self._prog_blur = None
+        self._prog_down = None
+        self._prog_up = None
         self._prog_post = None
         self._prog_overlay = None
         self._vaos = {}
         self._bb_vao = None
+        self._bb_count = 0
         self._quad_bright = None
-        self._quad_blur = None
+        self._quad_down = None
+        self._quad_up = None
         self._quad_post = None
         self._quad_overlay = None
         self._overlay_tex = None
@@ -275,10 +320,13 @@ class GLRenderer:
         self._fbo_scene = ctx.framebuffer(
             color_attachments=[scene_tex],
             depth_attachment=ctx.depth_renderbuffer((W, H)))
-        # bloom 半分辨率双缓冲
-        ha, hb = W // 2, H // 2
-        self._fbo_bloom_a = ctx.framebuffer(color_attachments=[ctx.texture((ha, hb), 4)])
-        self._fbo_bloom_b = ctx.framebuffer(color_attachments=[ctx.texture((ha, hb), 4)])
+        # bloom mip 链：1/2 → 1/2^GL_BLOOM_MIPS，半精度浮点（带格式回退）
+        mw, mh = W // 2, H // 2
+        self._bloom_mips = []
+        for _ in range(GL_BLOOM_MIPS):
+            self._bloom_mips.append(
+                (self._mk_bloom_fbo(ctx, mw, mh), mw, mh))
+            mw, mh = max(1, mw // 2), max(1, mh // 2)
         # offscreen 模式的合成目标
         if self.mode == "offscreen":
             self._fbo_out = ctx.framebuffer(color_attachments=[ctx.texture((W, H), 4)])
@@ -292,8 +340,10 @@ class GLRenderer:
         self._prog_bb = ctx.program(vertex_shader=_BB_VERT, fragment_shader=_BB_FRAG)
         self._prog_bright = ctx.program(vertex_shader=_FULLSCREEN_VERT,
                                         fragment_shader=_BRIGHT_FRAG)
-        self._prog_blur = ctx.program(vertex_shader=_FULLSCREEN_VERT,
-                                      fragment_shader=_BLUR_FRAG)
+        self._prog_down = ctx.program(vertex_shader=_FULLSCREEN_VERT,
+                                      fragment_shader=_DOWN_FRAG)
+        self._prog_up = ctx.program(vertex_shader=_FULLSCREEN_VERT,
+                                    fragment_shader=_UP_FRAG)
         self._prog_post = ctx.program(vertex_shader=_FULLSCREEN_VERT,
                                       fragment_shader=_POST_FRAG)
         self._prog_overlay = ctx.program(vertex_shader=_FULLSCREEN_VERT,
@@ -306,13 +356,55 @@ class GLRenderer:
             return ctx.vertex_array(prog, [(ctx.buffer(quad), "2f", "in_pos")])
 
         self._quad_bright = mk(self._prog_bright)
-        self._quad_blur = mk(self._prog_blur)
+        self._quad_down = mk(self._prog_down)
+        self._quad_up = mk(self._prog_up)
         self._quad_post = mk(self._prog_post)
         self._quad_overlay = mk(self._prog_overlay)
 
         # 场景 FBO 初始清屏（菜单期 draw_world 不会被调用，避免未初始化显存上屏）
         self._fbo_scene.use()
         ctx.clear(0.0, 0.0, 0.0, 1.0)
+
+    # ── bloom 纹理格式回退链 ──
+    def _mk_bloom_fbo(self, ctx, w, h):
+        """建单个 bloom 级 FBO：优先 R11F_G11F_B10F（省 1/4 带宽的 packed
+        半精度），失败退 RGBA16F，再失败退 RGBA8。整条链共用同一种格式。"""
+        import moderngl
+        if not self._bloom_fmt:
+            candidates = (
+                # internal_format 覆盖：GL_R11F_G11F_B10F（0x8C3A，3 分量 packed）
+                ("R11F_G11F_B10F", lambda: ctx.texture((w, h), 3, internal_format=0x8C3A)),
+                ("RGBA16F",        lambda: ctx.texture((w, h), 4, dtype="f2")),
+                ("RGBA8",          lambda: ctx.texture((w, h), 4)),
+            )
+            for name, mk_tex in candidates:
+                try:
+                    tex = mk_tex()
+                    tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
+                    fbo = ctx.framebuffer(color_attachments=[tex])
+                    # 可写探测：真渲染一帧才知道可附加性
+                    fbo.use()
+                    ctx.viewport = (0, 0, w, h)
+                    ctx.clear(0.0, 0.0, 0.0, 0.0)
+                    self._bloom_fmt = name
+                    return fbo
+                except Exception:
+                    continue
+            # 理论到不了这里：RGBA8 一定可渲染
+            raise RuntimeError("no renderable bloom format")
+        mk_tex = {
+            "R11F_G11F_B10F": lambda: ctx.texture((w, h), 3, internal_format=0x8C3A),
+            "RGBA16F":        lambda: ctx.texture((w, h), 4, dtype="f2"),
+        }.get(self._bloom_fmt)
+        if mk_tex is None:
+            mk_tex = lambda: ctx.texture((w, h), 4)
+        tex = mk_tex()
+        tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
+        fbo = ctx.framebuffer(color_attachments=[tex])
+        fbo.use()
+        ctx.viewport = (0, 0, w, h)
+        ctx.clear(0.0, 0.0, 0.0, 0.0)
+        return fbo
 
     # ── 世界切换（重开 / 重新加载）──
     def set_world(self, world):
@@ -321,6 +413,7 @@ class GLRenderer:
         self.world = world
         self._region_key = None
         self._bb_vao = None
+        self._bb_count = 0
         self._vaos.clear()
 
     # ── 区域网格（按需重建）──
@@ -345,31 +438,32 @@ class GLRenderer:
                 self._prog_world,
                 [(vbo, "3f 3f 2f", "in_pos", "in_normal", "in_uv")])
 
-        # 装饰物 billboard：数量少（3×3 区域几十个），直接展开成扁平顶点缓冲
+        # 装饰物 billboard：实例化渲染（静态单位 quad + 每实例 pos/color）
         mask = (cells >= 2) & (cells <= 12)
         ys, xs = np.nonzero(mask)
         if ys.size:
             wx = (base_x + xs + 0.5).astype(np.float32)
             wy = (base_y + ys + 0.5).astype(np.float32)
-            M = ys.size
-            corners = np.array([
-                (-0.5, 0.0), (0.5, 0.0), (0.5, 1.0),
-                (-0.5, 0.0), (0.5, 1.0), (-0.5, 1.0),
-            ], np.float32)
-            cen = np.stack([wx, wy, np.zeros_like(wx)], 1)
             types = cells[ys, xs]
             col = np.array([DECO_COLORS.get(int(t), (1.0, 1.0, 1.0))
                             for t in types], np.float32)
-            data = np.concatenate(
-                [np.repeat(cen, 6, axis=0),
-                 np.repeat(col, 6, axis=0),
-                 np.tile(corners, (M, 1))], 1).astype(np.float32)
-            bb_buf = ctx.buffer(data.tobytes())
+            inst = np.concatenate(
+                [np.stack([wx, wy, np.zeros_like(wx)], 1), col], 1)
+            # 单位 quad：每顶点仅 corner (x, y) 共 2 floats
+            quad = np.array([
+                (-0.5, 0.0), (0.5, 0.0), (0.5, 1.0),
+                (-0.5, 0.0), (0.5, 1.0), (-0.5, 1.0),
+            ], np.float32)
+            quad_buf = ctx.buffer(quad.tobytes())
+            inst_buf = ctx.buffer(np.ascontiguousarray(inst).tobytes())
             self._bb_vao = ctx.vertex_array(
                 self._prog_bb,
-                [(bb_buf, "3f 3f 2f", "in_pos", "in_col", "in_corner")])
+                [(quad_buf, "2f /v", "in_corner"),
+                 (inst_buf, "3f 3f /i", "in_inst_pos", "in_inst_col")])
+            self._bb_count = int(ys.size)
         else:
             self._bb_vao = None
+            self._bb_count = 0
 
     # ── 3D 场景 → scene FBO ──
     def draw_world(self, px, py, angle, pitch, zbuf, world, max_depth=MAX_DEPTH):
@@ -425,46 +519,62 @@ class GLRenderer:
             self._prog_bb["u_h"].value = GL_BB_H
             ctx.enable(moderngl.BLEND)
             ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE)
-            self._bb_vao.render()
+            self._bb_vao.render(instances=self._bb_count)
 
     # ── 后处理 + 覆盖层合成 + 呈现 ──
     def present(self, canvas=None):
         import moderngl
         ctx = self._ctx
-        hw, hh = W // 2, H // 2
+        mips = self._bloom_mips
 
-        # 1) 亮部提取 → bloom_a（半分辨率）
         ctx.disable(moderngl.DEPTH_TEST)
         ctx.disable(moderngl.BLEND)
-        self._fbo_bloom_a.use()
-        ctx.viewport = (0, 0, hw, hh)
+
+        # 1) 亮部提取（EEVEE 软膝曲线 + 钳制）→ mip0（半分辨率）
+        f0, w0, h0 = mips[0]
+        f0.use()
+        ctx.viewport = (0, 0, w0, h0)
         self._fbo_scene.color_attachments[0].use(0)
         self._prog_bright["u_scene"].value = 0
-        self._prog_bright["u_threshold"].value = GL_BLOOM_THRESHOLD
+        knee = GL_BLOOM_KNEE * GL_BLOOM_THRESHOLD
+        self._prog_bright["u_curve"].value = (
+            GL_BLOOM_THRESHOLD - knee, knee * 2.0,
+            0.25 / max(1e-5, knee), GL_BLOOM_THRESHOLD)
+        self._prog_bright["u_clamp"].value = GL_BLOOM_CLAMP
         self._quad_bright.render(mode=moderngl.TRIANGLE_STRIP)
 
-        # 2) 水平模糊 bloom_a → bloom_b
-        self._fbo_bloom_b.use()
-        ctx.viewport = (0, 0, hw, hh)
-        self._fbo_bloom_a.color_attachments[0].use(0)
-        self._prog_blur["u_tex"].value = 0
-        self._prog_blur["u_dir"].value = (1.0 / hw, 0.0)
-        self._quad_blur.render(mode=moderngl.TRIANGLE_STRIP)
+        # 2) 下采样链 mip[i] → mip[i+1]（4x4 box + Karis 加权）
+        for i in range(len(mips) - 1):
+            fsrc, ws, hs = mips[i]
+            fdst, wd, hd = mips[i + 1]
+            fdst.use()
+            ctx.viewport = (0, 0, wd, hd)
+            fsrc.color_attachments[0].use(0)
+            self._prog_down["u_tex"].value = 0
+            self._prog_down["u_texel"].value = (1.0 / ws, 1.0 / hs)
+            self._quad_down.render(mode=moderngl.TRIANGLE_STRIP)
 
-        # 3) 垂直模糊 bloom_b → bloom_a
-        self._fbo_bloom_a.use()
-        ctx.viewport = (0, 0, hw, hh)
-        self._fbo_bloom_b.color_attachments[0].use(0)
-        self._prog_blur["u_tex"].value = 0
-        self._prog_blur["u_dir"].value = (0.0, 1.0 / hh)
-        self._quad_blur.render(mode=moderngl.TRIANGLE_STRIP)
+        # 3) 上采样累加链 mip[i+1] → mip[i]（9-tap tent + ONE,ONE 加法混合）
+        ctx.enable(moderngl.BLEND)
+        ctx.blend_func = (moderngl.ONE, moderngl.ONE)
+        for i in range(len(mips) - 1, 0, -1):
+            fsrc, ws, hs = mips[i]
+            fdst, wd, hd = mips[i - 1]
+            fdst.use()
+            ctx.viewport = (0, 0, wd, hd)
+            fsrc.color_attachments[0].use(0)
+            self._prog_up["u_tex"].value = 0
+            self._prog_up["u_texel"].value = (1.0 / ws, 1.0 / hs)
+            self._prog_up["u_scale"].value = GL_BLOOM_SAMPLE_SCALE
+            self._quad_up.render(mode=moderngl.TRIANGLE_STRIP)
+        ctx.disable(moderngl.BLEND)
 
-        # 4) 合成：scene + bloom + 扫描线 + 暗角 + 曝光 → 输出目标
+        # 4) 合成：scene + bloom(mip0) + 扫描线 + 暗角 + 曝光 → 输出目标
         target = ctx.screen if self.mode == "window" else self._fbo_out
         target.use()
         ctx.viewport = (0, 0, W, H)
         self._fbo_scene.color_attachments[0].use(0)
-        self._fbo_bloom_a.color_attachments[0].use(1)
+        f0.color_attachments[0].use(1)
         self._prog_post["u_scene"].value = 0
         self._prog_post["u_bloom"].value = 1
         self._prog_post["u_res"].value = (float(W), float(H))
