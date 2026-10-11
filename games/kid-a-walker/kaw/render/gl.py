@@ -103,11 +103,14 @@ uniform float u_maxd;
 uniform float u_grid_str;   // 每组不同：墙最明显、地板中等、天花板最弱
 out vec4 frag;
 void main() {
-    // 程序化网格：每 1 个世界单位一条线
-    vec2 g = abs(fract(v_uv) - 0.5);
-    float line = smoothstep(0.46, 0.50, max(g.x, g.y));
+    // 程序化网格：每 1 个世界单位一条线。
+    // fwidth 屏幕空间抗锯齿：线宽恒约 1px，掠射角下远处自然淡出，
+    // 消除低矮天花板视角的 moire 与多边形切面感（GLSL 330 内建导数）
+    vec2 g = abs(fract(v_uv - 0.5) - 0.5) / fwidth(v_uv);
+    float line = 1.0 - min(min(g.x, g.y), 1.0);
+    float fade = exp(-v_dist * 0.10);   // 远处额外淡化（雾对高频闪烁掩蔽有限）
     vec3 col = mix(u_base, u_base_far, clamp(v_dist / u_maxd, 0.0, 1.0));
-    col *= (1.0 - u_grid_str * line);
+    col *= (1.0 - u_grid_str * line * fade);
     // 重力照明：地板最亮、墙面居中、天花板略暗（软曲线，避免天花板死黑）
     float ndl = 0.5 + 0.5 * v_normal.z;
     col *= (0.72 + 0.30 * ndl);

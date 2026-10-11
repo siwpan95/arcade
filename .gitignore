@@ -6,3 +6,4 @@ build/
 dist/
 release/
 games/kid-a-walker/highscore.json
+build_test/
