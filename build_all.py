@@ -44,40 +44,46 @@ def game_datas(sub):
 def build_game(sub, entry, console, excludes):
     d = GAMES_DIR / sub
     datas = game_datas(sub)
-    spec = BUILD / sub / (sub + ".spec")
-    spec.parent.mkdir(parents=True, exist_ok=True)
-    body = (
-        "# -*- mode: python ; coding: utf-8 -*-\n"
-        "# %s —— 逐游戏分体打包（自动生成，勿手改）\n"
-        "a = Analysis(\n"
-        "    [%r],\n"
-        "    pathex=[%r],\n"
-        "    binaries=[],\n"
-        "    datas=%r,\n"
-        "    hiddenimports=[],\n"
-        "    hookspath=[],\n"
-        "    hooksconfig={},\n"
-        "    runtime_hooks=[],\n"
-        "    excludes=%r,\n"
-        "    noarchive=False,\n"
-        ")\n"
-        "pyz = PYZ(a.pure)\n"
-        "exe = EXE(\n"
-        "    pyz,\n"
-        "    a.scripts,\n"
-        "    [],\n"
-        "    exclude_binaries=True,\n"
-        "    name='%s',\n"
-        "    debug=False,\n"
-        "    bootloader_ignore_signals=False,\n"
-        "    strip=False,\n"
-        "    upx=False,\n"
-        "    console=%s,\n"
-        "    contents_directory='.',\n"
-        ")\n"
-        "coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name='%s')\n"
-    ) % (sub, str(d / entry), str(d), datas, excludes, sub, str(console), sub)
-    spec.write_text(body, encoding="utf-8")
+    # 优先使用游戏自带 spec（复杂游戏需要 hiddenimports/动态库收集，
+    # 如 kid-a-walker 的 moderngl/glcontext）；否则自动生成通用 spec。
+    own = d / (sub + ".spec")
+    if own.exists():
+        spec = own
+    else:
+        spec = BUILD / sub / (sub + ".spec")
+        spec.parent.mkdir(parents=True, exist_ok=True)
+        body = (
+            "# -*- mode: python ; coding: utf-8 -*-\n"
+            "# %s —— 逐游戏分体打包（自动生成，勿手改）\n"
+            "a = Analysis(\n"
+            "    [%r],\n"
+            "    pathex=[%r],\n"
+            "    binaries=[],\n"
+            "    datas=%r,\n"
+            "    hiddenimports=[],\n"
+            "    hookspath=[],\n"
+            "    hooksconfig={},\n"
+            "    runtime_hooks=[],\n"
+            "    excludes=%r,\n"
+            "    noarchive=False,\n"
+            ")\n"
+            "pyz = PYZ(a.pure)\n"
+            "exe = EXE(\n"
+            "    pyz,\n"
+            "    a.scripts,\n"
+            "    [],\n"
+            "    exclude_binaries=True,\n"
+            "    name='%s',\n"
+            "    debug=False,\n"
+            "    bootloader_ignore_signals=False,\n"
+            "    strip=False,\n"
+            "    upx=False,\n"
+            "    console=%s,\n"
+            "    contents_directory='.',\n"
+            ")\n"
+            "coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name='%s')\n"
+        ) % (sub, str(d / entry), str(d), datas, excludes, sub, str(console), sub)
+        spec.write_text(body, encoding="utf-8")
     print("[build] " + sub + " ...", flush=True)
     r = subprocess.run(
         [sys.executable, "-m", "PyInstaller", str(spec), "--noconfirm",

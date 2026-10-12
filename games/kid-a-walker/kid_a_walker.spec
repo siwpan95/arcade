@@ -55,23 +55,32 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
+# onedir 平铺（contents_directory='.'）：与 build_all 菜单契约一致 ——
+# dist/games/kid-a-walker/kid-a-walker.exe，exe+dll+数据同目录，cwd 相对成立。
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
-    name='kid_a_walker',
+    exclude_binaries=True,
+    name='kid-a-walker',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
+    upx=False,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    contents_directory='.',
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=False,
+    name='kid-a-walker',
 )
