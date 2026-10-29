@@ -70,3 +70,15 @@ python make_release.py --only kid-a-walker --ver v1.1.0   # 单游戏 + 自定�
 ## 整合背景
 
 详见《单文件玩具整合方案_2026-08-25》：吸血鬼幸存者/公路驾驶/俄罗斯轮盘/贪吃蛇/文字传奇/挂机族等玩法重复重做已收敛（重复版删除，保留版独立成项目并登记平台）。
+
+## 独立仓收拢（2026-10-29）
+
+`games/` 下的玩法原先另有独立仓，现统一收进本仓，独立仓与远端一并撤销：
+
+| 原独立仓 | 收拢到 | 处理 |
+|---|---|---|
+| siwpan/calculator | games/calculator | 独立仓新一代（包化重构 `calculator/` + tests）已覆盖旧快照；selfcheck 退出 0、单测 77 通过 |
+| siwpan/happy-childrens-day | games/sixone | 源码本就同版；补齐 selfcheck.py / CHANGELOG.md / README.en.md / LICENSE |
+
+其余 8 个玩法（tetris/tictactoe/moyuxiaqi/kid-a-walker/ski/puzzle/2048/rider）在收拢前已无独立仓。
+归档 git bundle 存于 `G:\allin\docs\历史\`。
