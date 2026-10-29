@@ -14,6 +14,7 @@ from __future__ import annotations
 import ast
 import os
 import random
+import subprocess
 import sys
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -124,15 +125,32 @@ def check_ski_engine():
     return ski_config.MODE_ENDLESS
 
 
+def check_calculator_selfcheck():
+    """调用 games/calculator 自带的无头自检（独立仓收拢后，覆盖面并入本入口）。"""
+    calc_dir = os.path.join(BASE_DIR, "games", "calculator")
+    script = os.path.join(calc_dir, "selfcheck.py")
+    check(os.path.isfile(script), f"缺少 calculator 自检脚本: {script}")
+    proc = subprocess.run(
+        [sys.executable, script],
+        cwd=calc_dir,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    check(proc.returncode == 0,
+          f"calculator selfcheck 失败(exit {proc.returncode}): {(proc.stdout or '')[-300:]}")
+    return (proc.stdout or "").strip().splitlines()[-1] if proc.stdout else ""
+
+
 def main() -> int:
     try:
         games = load_games_manifest()
         check_manifest(games)
         mode = check_ski_engine()
+        calc_note = check_calculator_selfcheck()
         print(
             f"selfcheck ok: 街机清单 {len(games)} 项与磁盘入口全部对应；"
             f"ASCII 滑雪引擎（{mode}）tick 推进 2 格距离、吃旗 +10、撞树 -50、"
-            "低分 game_over 判定均正确"
+            "低分 game_over 判定均正确；"
+            f"calculator 自检通过（{calc_note}）"
         )
         return 0
     except Exception as exc:  # noqa: BLE001
