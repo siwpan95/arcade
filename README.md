@@ -81,4 +81,7 @@ python make_release.py --only kid-a-walker --ver v1.1.0   # 单游戏 + 自定�
 | siwpan/happy-childrens-day | games/sixone | 源码本就同版；补齐 selfcheck.py / CHANGELOG.md / README.en.md / LICENSE |
 
 其余 8 个玩法（tetris/tictactoe/moyuxiaqi/kid-a-walker/ski/puzzle/2048/rider）在收拢前已无独立仓。
-归档 git bundle 存于 `G:\allin\docs\历史\`。
+归档落点：工作树 `G:\archive\<name>-retired-20261029\`，全引用 bundle `G:\archive\<name>-2026-10-29.bundle`；两侧远端已删除。
+
+> 说明：本节对应的 3 个提交落在归档声明（`905c15d`）**之后**，是冻结前的最后一笔资产收拢——
+> 按首屏归档声明「完整 git 历史一并迁入」，它们会随 `archive/arcade` 分支一并进入 game-prototypes。
